@@ -12,24 +12,30 @@ We propose a novel method to disentangle private-shared information between hete
 multiple VAEs structures. In that way, we are capable of:
 - Conditioning **multiple** VAEs to binary or multilabel targets
  ![](paperimages/condition_a_vae.png)
-*Feasibility test: vanilla VAE vs vanilla VAE with FA-VAE approach* 
+ 
+    *Feasibility test: vanilla VAE vs vanilla VAE with FA-VAE approach* 
 - Combining **multiple** VAEs to learn and **disentangle private-shared**
 information from different m-views
 ![](paperimages/private_spaces.png)
-*Analysis of private information over CelebA and Cartoon datasets*
+
+    *Analysis of private information over CelebA and Cartoon datasets*
 ![](paperimages/esc3_z_trans2.png)
-*Analysis of shared information over CelebA and Cartoon datasets*
+
+    *Analysis of shared information over CelebA and Cartoon datasets*
 ![](paperimages/esc3_celeb2cart_umap.png)
-*Analysis of private-shared information over CelebA and Cartoon datasets*
+
+    *Analysis of private-shared information over CelebA and Cartoon datasets*
 
 - Performing **domain adaptation** given different representations of the
 same data by using multiple VAEs:
 ![](paperimages/esc3_celeb2cart.png)
-*Domain adaptation performed between CelebA and Cartoon datasets*
+
+    *Domain adaptation performed between CelebA and Cartoon datasets*
 
 - Performing **transfer learning** between multiple VAEs
 ![](paperimages/transfer_learning.png)
-*Transfer learning approach: $\beta$-VAE trained by its own vs Transfer learning to $\beta$-VAE with FA-VAE approach*
+
+    *Transfer learning approach: $\beta$-VAE trained by its own vs Transfer learning to $\beta$-VAE with FA-VAE approach*
 
 ## Abstract
 
