@@ -1,0 +1,27 @@
+# Created by .ignore support plugin (hsz.mobi)
+### Archives template
+# It's better to unpack these files and commit the raw source because
+# git has its own built in compression methods.
+/old/
+/datasets/
+/wandb/
+/baselines/
+/__pycache__/
+.ipynb_checkpoints
+.vscode
+*.log
+# Condition-a-VAE folder
+/condition_a_VAE/wandb/
+/condition_a_VAE/checkpoints/
+/condition_a_VAE/logs/
+/condition_a_VAE/results/
+# domain_adaptation folder
+/domain_adaptation/wandb/
+/domain_adaptation/checkpoints/
+/domain_adaptation/logs/
+/domain_adaptation/results/
+# transfer_learning folder
+/transfer_learning/wandb/
+/transfer_learning/checkpoints/
+/transfer_learning/logs/
+/transfer_learning/results/
