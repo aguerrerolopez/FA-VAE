@@ -15,13 +15,16 @@
 /condition_a_VAE/checkpoints/
 /condition_a_VAE/logs/
 /condition_a_VAE/results/
+/condition_a_VAE/__pycache__/
 # domain_adaptation folder
 /domain_adaptation/wandb/
 /domain_adaptation/checkpoints/
 /domain_adaptation/logs/
 /domain_adaptation/results/
+/domain_adaptation/__pycache__/
 # transfer_learning folder
 /transfer_learning/wandb/
 /transfer_learning/checkpoints/
 /transfer_learning/logs/
 /transfer_learning/results/
+/transfer_learning/__pycache__/
