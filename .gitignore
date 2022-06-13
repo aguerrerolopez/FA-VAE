@@ -5,7 +5,8 @@
 /old/
 /datasets/
 /wandb/
-/baselines/
+/baselines/Multi-VAE/models/
+/baselines/Multi-VAE/utils/DATA
 /__pycache__/
 .ipynb_checkpoints
 .vscode
