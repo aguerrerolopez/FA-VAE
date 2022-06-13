@@ -7,7 +7,7 @@
 /wandb/
 /baselines/Multi-VAE/models/
 /baselines/Multi-VAE/utils/DATA
-/__pycache__/
+*/__pycache__/
 .ipynb_checkpoints
 .vscode
 *.log
