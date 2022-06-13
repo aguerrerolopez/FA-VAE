@@ -10,7 +10,7 @@ This paper has been submitted for publication in *JOURNAL HERE*.
 
 We propose a novel method to disentangle private-shared information between heterogeneous views of the same observation. To do so, we propose a factor analysis framework to combine
 multiple VAEs structures. In that way, we are capable of:
-- Conditioning **multiple** VAEs to binary or multilabel targets
+- Conditioning **single** VAEs to binary or multilabel targets
  ![](paperimages/condition_a_vae.png)
  
     *Feasibility test: vanilla VAE vs vanilla VAE with FA-VAE approach* 
@@ -28,9 +28,14 @@ information from different m-views
 
 - Performing **domain adaptation** given different representations of the
 same data by using multiple VAEs:
-![](paperimages/esc3_celeb2cart.png)
+    
+    ![](paperimages/esc3_celeb2cart.png)
 
-    *Domain adaptation performed between CelebA and Cartoon datasets*
+    *Domain adaptation performed by FA-VAE Model*
+
+    ![](paperimages/multi_vae_domainadap.png)
+
+    *Domain adaptation performed by Multi-VAE SOTA model*
 
 - Performing **transfer learning** between multiple VAEs
 ![](paperimages/transfer_learning.png)
