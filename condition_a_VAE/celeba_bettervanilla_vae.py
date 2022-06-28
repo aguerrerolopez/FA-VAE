@@ -130,7 +130,7 @@ class ImgVAE(VAE):
         logp_data = -0.5 * (cnt + torch.sum((true_images - reconstructed_images) * var_x ** -1 * (true_images - reconstructed_images), dim=-1))
         return logp_data.mean() # Mean reduction. It has to be equal as KL reduciton
  
-    def trainloop(self, img=None, Z=None, W=None, b=None, tau=None, epochs=20, wandb=None, favae=False):
+    def trainloop(self, img=None, Z=None, W=None, b=None, tau=None, epochs=20, wandb=None, beta=1, favae=False):
         if img is not None:
             self.img = torch.tensor(img)
         # Lists to store training evolution
@@ -179,7 +179,7 @@ class ImgVAE(VAE):
                 # ==================== Loss calculation ===================
                 reconstruction_error = -self.gaussian_LL(images, img_rec)
                 kl_div = self.kl_div(mu_Q, std_Q, mu_P, std_P)
-                loss = reconstruction_error + kl_div
+                loss = reconstruction_error + beta*kl_div
                 elbo = -loss
                 # ==================== Gradient calculation ===================
                 loss.backward()
@@ -245,8 +245,8 @@ class ImgVAE(VAE):
         # Create a loader to update X by batches due to lack of memory
         dataset = TensorDataset(img)
         loader = DataLoader(dataset=dataset, batch_size=64, shuffle=False)
-        mu = np.zeros((img.shape[0], self.latentdim))
-        var = np.zeros((img.shape[0], self.latentdim))
+        mu = np.zeros((img.shape[0], 100))
+        var = np.zeros((img.shape[0], 100))
         self.eval()
         with torch.no_grad():
             batch_index = 0

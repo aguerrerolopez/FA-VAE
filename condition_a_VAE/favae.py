@@ -390,7 +390,9 @@ class SSHIBA(object):
                                     self.SS_mask, self.area_mask, self.hyper, b_init = self.b_init,
                                     Z_init = self.Z_init, W_init = self.W_init, alpha_init = self.alpha_init,
                                     tau_init = self.tau_init, gamma_init = self.gamma_init)
-        self.fit_iterate(**kwargs)
+        print(kwargs)
+        if not kwargs['pretrained']:
+            self.fit_iterate(**kwargs)
 
 
 
@@ -675,7 +677,6 @@ class SSHIBA(object):
                 Y_pred = self.predict(m_in, m_out, X_tst)
         return Y_pred
 
-
     def compute_mse(self, Y_tst, X_tst, m_in=[0], m_out=1):
         # if not(type(X_tst) == dict):
         #     m_in = np.arange(self.m-1)
@@ -847,29 +848,6 @@ class SSHIBA(object):
                 self.wandb_metrics[self.img_vae[m].dataset+" R2 reconstruction"] = r2_train
                 print("R2 reconstruction score in training for "+self.img_vae[m].dataset+" dataset")
                 print(r2_train)
-                # # GaussianLogLikelihood given the other views
-                # img_fake = self.img_vae[m].predict(Z=q.Z, W=q.W[m], b=q.b[m], tau=q.tau_mean(m))
-                # gLL = self.img_vae[m].gaussian_LL(torch.Tensor(self.t[m]['data']), torch.Tensor(img_fake))
-                # self.wandb_metrics[self.img_vae[m].dataset+" Gaussian LogLikelihood given other views"] = gLL
-                # print("GLL given other views over "+self.img_vae[m].dataset+" dataset")
-                # print(gLL)
-                # # Plot reconstruction
-                # from matplotlib import pyplot as plt
-                # plt.imshow(np.transpose(img_fake[10, :, :, :], axes=[1,2,0]))
-                # plt.savefig("plots/"+self.img_vae[m].dataset+"_"+str(self.latentspace_lr)+"_fake"+str(m)+".png")
-                # # Plot real image
-                # if iter_count<2:
-                #     plt.imshow(np.transpose(self.t[m]['data'][10], axes=[1,2,0]))
-                #     plt.savefig("plots/"+self.img_vae[m].dataset+"_real"+str(m))
-                # # Plot reconstrucion
-                # plt.imshow(np.transpose(img_fake[100, :, :, :], axes=[1,2,0]))
-                # plt.savefig("plots/"+self.img_vae[m].dataset+"_"+str(self.latentspace_lr)+"_fake2"+str(m)+".png")
-                # # Plot real image
-                # if iter_count<2:
-                #     plt.imshow(np.transpose(self.t[m]['data'][100], axes=[1,2,0]))
-                #     plt.savefig("plots/"+self.img_vae[m].dataset+"_real2"+str(m))
-                # plt.close('all')
-
 
             # MultiLabel
             elif self.method[m] == 'mult':
@@ -1411,6 +1389,107 @@ class SSHIBA(object):
                     if arg['method'] == 'img':
                         X_mean, X_cov = self.img_vae[m_in[m]].update_x(arg['data'])
                         X_sample = X_mean + np.random.randn()*np.sqrt(X_cov)
+                        print("X size"+ str(X_sample.shape))
+                        print("b size"+ str(q.b[m_in[m]]['mean'].shape))
+                        print("W size"+ str(q.W[m_in[m]]['mean'].shape))
+                        print("tau size"+ str(q.tau_mean(m_in[m]).shape))
+                        # norm_W = q.W[m_in[m]]['mean'] / q.W[m_in[m]]['mean'].sum(axis=1)[:, np.newaxis]
+                        self.Z_mean += np.dot(X_sample - q.b[m_in[m]]['mean'], q.W[m_in[m]]['mean'] ) * q.tau_mean(m_in[m])
+                    # NEW FOR MULTILABEL
+                    if arg['method'] == 'mult':
+                        X_mean = np.log(np.abs((arg['data']-0.05))/(1 - np.abs((arg['data']-0.05))))
+                        self.Z_mean += np.dot(X_mean - q.b[m_in[m]]['mean'], q.W[m_in[m]]['mean']) * q.tau_mean(m_in[m])
+                else:
+                    for (m,x) in enumerate(arg):
+                        if x['method'] == 'cat': #categorical
+                            x['data'] = label_binarize(x['data'], classes = np.arange(self.d[m_in[m]]))
+                        self.Z_mean += np.dot(x['data'] - q.b[m]['mean'], q.W[m_in[m]]['mean']) * q.tau_mean(m_in[m])
+
+            self.Z_mean = np.dot(self.Z_mean,Z_cov)
+        else:
+            print ('Cov Z is not invertible')
+
+        predictions = {}
+        if isinstance(m_outs, int): m_outs = [m_outs]
+        for m_out in m_outs:
+            #Regression
+            if self.method[m_out] == 'reg':
+                #Expectation X
+                mean_x = np.dot(self.Z_mean,q.W[m_out]['mean'].T) + q.b[m_out]['mean']
+                #Variance X
+                var_x = q.tau_mean(m_out)**(-1)*np.eye(self.d[m_out]) + np.linalg.multi_dot([q.W[m_out]['mean'], Z_cov, q.W[m_out]['mean'].T])
+
+                predictions["output_view"+str(m_out)] = {'mean_x': mean_x, 'var_x': var_x}
+
+            if self.method[m_out] == 'img':
+                experimentfaces=1
+                if experimentfaces:
+                    sampleZ = self.Z_mean + np.random.normal()*np.sqrt(np.diag(Z_cov))
+                    print("SampleZ size "+str(sampleZ.shape))
+                    print("q.W[m_out]size "+str(q.W[m_out]['mean'].shape))
+                    print("q.b[m_out]size "+str(q.b[m_out]['mean'].shape))
+                    sampleX = sampleZ@q.W[m_out]['mean'].T-q.b[m_out]['mean']
+                    pred_img = self.img_vae[m_out].decoder(torch.tensor(sampleX).float().to(self.img_vae[m_out].device))
+                    xcart = 0
+                else:
+                    Z_in = {'mean': self.Z_mean, 'cov': Z_cov}
+                    pred_img, xcart = self.img_vae[m_out].predict(Z=Z_in, W=q.W[m_out], b=q.b[m_out], tau=q.tau_mean(m_out))
+                    
+                # Prediction other way
+                # mean_x = np.dot(self.Z_mean,q.W[m_out]['mean'].T) + q.b[m_out]['mean']
+                # var_x = q.tau_mean(m_out)**(-1)*np.eye(self.d[m_out]) + np.linalg.multi_dot([q.W[m_out]['mean'], Z_cov, q.W[m_out]['mean'].T])
+                # pred_img = self.img_vae[m_out].predict(mean_x=mean_x, var_x=var_x)
+                
+                # predictions = pred_img, X_sample, self.Z_mean, xcart
+                predictions = pred_img, self.Z_mean, xcart
+
+            #Categorical
+            elif self.method[m_out] == 'cat':
+                Z_in = {'mean': self.Z_mean, 'cov': Z_cov}
+                pred_img = self.cat_vae[m_out].predict(Z=Z_in, W=q.W[m_out], b=q.b[m_out], tau=q.tau_mean(m_out)).data.cpu().numpy()
+                predictions = pred_img
+                
+            #Multilabel
+            elif self.method[m_out] == 'mult':
+                print("sale multilabel")
+                #Expectation X
+                m_x = np.dot(self.Z_mean, q.W[m_out]['mean'].T) + q.b[m_out]['mean']
+                #Variance X
+                var_x = q.tau_mean(m_out)**(-1)*np.eye(self.d[m_out]) + np.linalg.multi_dot([q.W[m_out]['mean'], Z_cov, q.W[m_out]['mean'].T])
+                
+                mean_t = np.zeros((n_pred,self.d[m_out]))
+                var_t = np.zeros((n_pred,self.d[m_out]))
+                #Probability t
+                for d in np.arange(self.d[m_out]):
+                    mean_t[:,d] = self.sigmoid(m_x[:,d]*(1+math.pi/8*var_x[d,d])**(-0.5))
+                    # mean_t[:,d] = self.sigmoid(m_x[:,d])
+                    var_t[:, d] = np.exp(m_x[:,d]*(1+math.pi/8*var_x[d,d])**(-0.5))/(1+np.exp(m_x[:,d]*(1+math.pi/8*var_x[d,d])**(-0.5))**2)
+                    # var_t[:,d] = np.exp(m_x[:, d])/(1+np.exp(m_x[:, d]))**2
+                predictions["output_view"+str(m_out)] = {'mean_x': mean_t, 'var_x': var_t}
+
+        return predictions
+                
+    def predict_sameimage(self, m_in, m_outs, *args):
+        q = self.q_dist
+
+        if type(args[0]) == dict:
+            n_pred = np.shape(args[0]['data'])[0]
+        else:
+            n_pred = np.shape(args[0][0]['data'])[0]
+
+        aux = np.eye(q.Kc)
+        for m in m_in:
+            aux += q.tau_mean(m)*np.dot(q.W[m]['mean'].T, q.W[m]['mean'])
+        Z_cov = self.myInverse(aux)
+
+        if not np.any(np.isnan(Z_cov)):
+            self.Z_mean = np.zeros((n_pred,q.Kc))
+            for m,arg in enumerate(args):
+                if type(arg) == dict:
+                    # NEW FOR IMAGES
+                    if arg['method'] == 'img':
+                        X_mean, X_cov = self.img_vae[m_in[m]].update_x(arg['data'])
+                        X_sample = X_mean + np.random.randn()*np.sqrt(X_cov)
                         # norm_W = q.W[m_in[m]]['mean'] / q.W[m_in[m]]['mean'].sum(axis=1)[:, np.newaxis]
                         self.Z_mean += np.dot(X_sample - q.b[m_in[m]]['mean'], q.W[m_in[m]]['mean'] ) * q.tau_mean(m_in[m])
                     # NEW FOR MULTILABEL
@@ -1447,7 +1526,9 @@ class SSHIBA(object):
                 # mean_x = np.dot(self.Z_mean,q.W[m_out]['mean'].T) + q.b[m_out]['mean']
                 # var_x = q.tau_mean(m_out)**(-1)*np.eye(self.d[m_out]) + np.linalg.multi_dot([q.W[m_out]['mean'], Z_cov, q.W[m_out]['mean'].T])
                 # pred_img = self.img_vae[m_out].predict(mean_x=mean_x, var_x=var_x)
-                predictions = pred_img, X_sample, self.Z_mean, xcart
+                
+                # predictions = pred_img, X_sample, self.Z_mean, xcart
+                predictions = pred_img, self.Z_mean, xcart
 
             #Categorical
             elif self.method[m_out] == 'cat':
@@ -1474,8 +1555,6 @@ class SSHIBA(object):
                 predictions["output_view"+str(m_out)] = {'mean_x': mean_t, 'var_x': var_t}
 
         return predictions
-                
-
 
     def HGamma(self, a, b):
         """Compute the entropy of a Gamma distribution.
