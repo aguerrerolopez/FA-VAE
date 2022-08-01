@@ -1,5 +1,4 @@
-# FA-VAE paper
-
+# Multi-view hierarchical Variational AutoEncoders with Factor Analysis latent space
 by
 Alejandro Guerrero-López,
 Carlos Sevilla-Salcedo,
