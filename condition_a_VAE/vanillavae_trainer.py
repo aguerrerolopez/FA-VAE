@@ -7,7 +7,7 @@ import wandb
 torch.manual_seed(0)
 
 # # ============================ Init WandB ===========================
-wandb_obj = wandb.init(project="vae-sshiba", group='Escenario 1', job_type='pretrain_celeba_alone', entity="alexjorguer")
+# wandb_obj = wandb.init(project="vae-sshiba", group='Escenario 1', job_type='pretrain_celeba_alone', entity="alexjorguer")
 # # ============================ Load CELEBA ===========================
 print("Loading dataset")
 celeba = datasets.ImageFolder(root="../datasets/celeba/", transform=transforms.Compose([
