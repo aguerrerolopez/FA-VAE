@@ -1,12 +1,11 @@
-# FA-VAE paper
-
+# Multi-view hierarchical Variational AutoEncoders with Factor Analysis latent space
 by
 Alejandro Guerrero-López,
 Carlos Sevilla-Salcedo,
 Vanessa Gómez-Verdejo
 and Pablo M. Olmos
 
-This paper has been submitted for publication in *JOURNAL HERE*.
+This paper has been submitted for publication in *Knowledge-Based Systems*, and the [preprint](https://arxiv.org/abs/2207.09185) is already available.
 
 We propose a novel method to disentangle private-shared information between heterogeneous views of the same observation. To do so, we propose a factor analysis framework to combine
 multiple VAEs structures. In that way, we are capable of:
