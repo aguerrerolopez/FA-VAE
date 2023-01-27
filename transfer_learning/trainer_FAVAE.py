@@ -108,5 +108,5 @@ myModel_new.fit(betaVAE, input_pre, labels,
 
 import pickle
 store = {"model": myModel_new}
-with open('./results/model_celeba_pretrained_conditioned_v3_'+str(args.lr)+'.pickle', 'wb') as handle:
+with open('./results/model_celeba_pretrained_conditioned_v3_2_'+str(args.lr)+'.pickle', 'wb') as handle:
     pickle.dump(store, handle, protocol=pickle.HIGHEST_PROTOCOL)

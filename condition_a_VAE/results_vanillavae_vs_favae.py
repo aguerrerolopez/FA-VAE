@@ -76,3 +76,24 @@ plt.plot(np.concatenate(model['model'].kl_q_p)[1:], label="FA-VAE")
 plt.plot(np.array(modelpre['model'].KL_QandP[1:]), label="Vanilla VAE")
 plt.legend()
 plt.show()
+
+
+elbo_favae = -np.concatenate(model['model'].recon_loss)[1:] + np.concatenate(model['model'].kl_q_p)[1:]
+elbo_vae = -np.array(modelpre['model'].reconstruc_during_training)[1:] + np.array(modelpre['model'].KL_QandP[1:])
+
+plt.figure()
+plt.title("VAE ELBO inside FA-VAE")
+plt.ylim(2000,16000)
+plt.xlabel("Epochs")
+plt.plot(elbo_favae, 'b', label="FA-VAE")
+plt.legend()
+plt.show()
+
+
+plt.figure()
+plt.title("VAE ELBO from scratch")
+plt.ylim(2000,16000)
+plt.xlabel("Epochs")
+plt.plot(elbo_vae, 'orange', label="VAE from scratch")
+plt.legend()
+plt.show()

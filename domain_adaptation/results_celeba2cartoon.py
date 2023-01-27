@@ -18,6 +18,39 @@ celeb2cart = pickle.load(usps_mnist_path)
 usps_mnist_path.close()
 del usps_mnist_path
 
+#%% ####################################### PLOT THE LATENT SPACE FEATURES BY VIEW ###################################3
+# View to order the importance
+view = 2
+# K dimension of the latent space
+k_len = len(celeb2cart['model'].q_dist.alpha[view]['b'])
+# Reorder the features w.r.t the more important ones for the RM view
+ord_k = np.argsort(celeb2cart['model'].q_dist.alpha[view]['a']/celeb2cart['model'].q_dist.alpha[view]['b'])
+# Create the matrix to plot afterwards
+matrix_views = np.zeros((len(celeb2cart['model'].q_dist.W),celeb2cart['model'].q_dist.W[0]['mean'].shape[1]))
+# There are 13 views because the CARB+ESBL, ESBL and SUSCEPTIBLE are in the same view.
+n_rowstoshow = 3
+matrix_views = np.zeros((n_rowstoshow,celeb2cart['model'].q_dist.W[0]['mean'].shape[1]))
+for z in range(matrix_views.shape[0]):
+    matrix_views[z, :]=np.mean(np.abs(celeb2cart['model'].q_dist.W[z]['mean']), axis=0)[ord_k]
+
+titles_views = ['CelebA', 'Cartoon', 'Hair']
+
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import cm
+cmap = cm.get_cmap('Dark2', 4)
+for v, view in enumerate(titles_views):
+    plt.figure(figsize=[10,5])
+    ax = plt.gca()
+    ax.set_title(view+" view", color=cmap(v))
+    plt.yticks([], [])
+    plt.xticks(range(0, len(ord_k)), ord_k.tolist())
+    plt.xlabel("K features")
+    im = ax.imshow(matrix_views[v,:][:, np.newaxis].T, cmap="binary")
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    plt.show()
+
 #%% #================= GENERATE SAMPLES CONDITIONALLY =================
 
 labels_ohe = np.eye(3)

@@ -18,8 +18,7 @@ class VAE(nn.Module):
         self.channels = channels
         self.dataset=dataset
         self.latentspace_lr = latentspace_lr
-        self.latentdim = zDim
-        
+
         modules = []
         hidden_dims = [64, 128, 256, 512, 1024]
         # CNN Encoder

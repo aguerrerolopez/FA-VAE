@@ -4,7 +4,8 @@ from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from sklearn.metrics import r2_score
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
 
 #================= LOAD MODELS =================
 pretrained_vae_path = open('./results/pretrained_celeba_bigbeta_v3.pickle', 'rb')
@@ -12,7 +13,7 @@ pretrained_vae = pickle.load(pretrained_vae_path)
 pretrained_vae_path.close()
 del pretrained_vae_path
 
-sshiba_conditioned_path = open('./results/model_celeba_pretrained_conditioned_v3_1.0.pickle', 'rb')
+sshiba_conditioned_path = open('./results/model_celeba_pretrained_conditioned_v3_2_1.0.pickle', 'rb')
 sshiba_conditioned = pickle.load(sshiba_conditioned_path)
 sshiba_conditioned_path.close()
 del sshiba_conditioned_path
@@ -122,15 +123,13 @@ celeba_train = celeba_numpy[20000:, :, :, :]
 
 # Pretrain VAE images
 pretrained_vae['model'].eval()
-pretrained_vae['model'].to(device)
 model = sshiba_conditioned['model'].img_vae[0]
 model.eval()
-model.to(device)
 
 img_idx = [433,111,154,839,51]
 # img_idx = np.random.choice(np.arange(1000), size=4)
-preimages, _, _, _ = pretrained_vae['model'].forward(celeba_train[img_idx].to(device))
-sshibaimages, _, _, _ = model.forward(celeba_train[img_idx].to(device))
+preimages, _, _, _ = pretrained_vae['model'].forward(celeba_train[img_idx].to(pretrained_vae['model'].device))
+sshibaimages, _, _, _ = model.forward(celeba_train[img_idx].to(model.device))
 fig, ax = plt.subplots(nrows=3, ncols=5, sharex=True, sharey=True)
 for i in range(3):
     if i==0: images, title = celeba_train[img_idx], "Input"
@@ -158,14 +157,19 @@ for ax, im in zip(grid, imgs):
 plt.show()
 
 #R2 scores
-images = celeba_train[:1000].to(device)
+images = celeba_train[:3000].to(model.device)
 preimages, _, _, _ = pretrained_vae['model'].forward(images)
 print("BVAE r2 score: "+str(r2_score(images.data.cpu().ravel(), preimages.data.cpu().ravel())))
-
+bvae_r2 = []
+for i, img in enumerate(images.data.cpu()):
+    bvae_r2.append(r2_score(img.ravel(), preimages.data.cpu()[i].ravel()))
 
 sshibaimages, _, _, _ = sshiba_conditioned['model'].img_vae[0].forward(images)
 print("SSHIBA r2 score: "+str(r2_score(images.data.cpu().ravel(), sshibaimages.data.cpu().ravel())))
 
+favae_r2 = []
+for i, img in enumerate(images.data.cpu()):
+    favae_r2.append(r2_score(img.ravel(), sshibaimages.data.cpu()[i].ravel()))
 
 # ================================= Latent space study =================================
 import itertools
@@ -173,7 +177,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 
 labels_name = ["Smiling", "Wearing_Lipstick", "Male"]
 
-labels = np.asarray([0,0,1]).reshape(1,-1)
+labels = np.asarray([1,0,0]).reshape(1,-1)
 labels_view = sshiba_conditioned['model'].struct_data(labels, 'mult')
 
 def predict(model, m_in, m_outs, *args):
@@ -287,7 +291,7 @@ mean = torch.from_numpy(Z_sampled@W_sampled.T+b_sampled)
 std = torch.sqrt(torch.ones_like(mean)/torch.from_numpy(np.asarray(1/tau)))
 p = torch.distributions.Normal(mean, std)
 latent_space = p.rsample().float()
-v = np.arange(-20,20,4)
+v = np.arange(-20,24,4)
 relf = np.argsort(-latent_space.abs())[0, :10].tolist()
 
 def plot_images(model, feature, v, latent_space):
@@ -319,7 +323,7 @@ std = torch.sqrt(torch.ones_like(mean)*1/torch.from_numpy(np.asarray(1)))
 
 p = torch.distributions.Normal(mean, std)
 latent_sample = p.rsample().float()
-v = np.arange(-20,20,4)
+v = np.arange(-20,24,4)
 relf = np.argsort(-latent_sample.abs())[0, :10].tolist()
 
 imgs = plot_images(pretrained_vae['model'], relf, v, latent_sample)

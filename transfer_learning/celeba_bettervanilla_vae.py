@@ -18,8 +18,7 @@ class VAE(nn.Module):
         self.channels = channels
         self.dataset=dataset
         self.latentspace_lr = latentspace_lr
-        self.latentdim = zDim
-        
+
         modules = []
         hidden_dims = [64, 128, 256, 512, 1024]
         # CNN Encoder
@@ -238,12 +237,16 @@ class ImgVAE(VAE):
 
     def update_x(self, img=None):
         if img is not None:
+            print(img.shape)
             img = torch.Tensor(img)
+        else:
+            print("no deberia")
+            img = self.img
         # Create a loader to update X by batches due to lack of memory
-        dataset = TensorDataset(self.img)
+        dataset = TensorDataset(img)
         loader = DataLoader(dataset=dataset, batch_size=64, shuffle=False)
-        mu = np.zeros((self.img.shape[0], self.latentdim))
-        var = np.zeros((self.img.shape[0], self.latentdim))
+        mu = np.zeros((img.shape[0], 100))
+        var = np.zeros((img.shape[0], 100))
         self.eval()
         with torch.no_grad():
             batch_index = 0

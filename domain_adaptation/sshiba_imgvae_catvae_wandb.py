@@ -17,7 +17,7 @@ import time
 import logging
 import wandb
 # Change only this lane to change the VAE used in FA-VAE
-import betaVAE as img_vae
+import celeba2cartoon_vae as img_vae
 
 
 torch.manual_seed(0)
@@ -818,7 +818,7 @@ class SSHIBA(object):
                     self.total_elbo.append(self.img_vae[m].elbo_training)
                     self.recon_loss.append(self.img_vae[m].reconstruc_during_training)
                     self.kl_q_p.append(self.img_vae[m].KL_QandP)
-                    # self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
+                    self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
                     # Update X mean and X cov
                     self.X[m]['mean'], self.X[m]['cov'] = self.img_vae[m].update_x(img=self.t[m]['data'])
                     self.X[m]['prodT'] = np.dot(self.X[m]['mean'].T, self.X[m]['mean']) + np.diag(np.sum(self.X[m]['cov'],axis=0))
@@ -833,7 +833,7 @@ class SSHIBA(object):
                         self.total_elbo.append(self.img_vae[m].elbo_training)
                         self.recon_loss.append(self.img_vae[m].reconstruc_during_training)
                         self.kl_q_p.append(self.img_vae[m].KL_QandP)
-                        # self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
+                        self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
                         # Update X mean and X cov
                         self.X[m]['mean'], self.X[m]['cov'] = self.img_vae[m].update_x(img=self.t[m]['data'])
                         self.X[m]['prodT'] = np.dot(self.X[m]['mean'].T, self.X[m]['mean']) + np.diag(np.sum(self.X[m]['cov'],axis=0))
