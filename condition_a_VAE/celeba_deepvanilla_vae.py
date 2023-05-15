@@ -235,8 +235,8 @@ class ImgVAE(VAE):
                 # ==================== VAE forward===================
                 img_rec, mu_Q, std_Q, latent_sample = self.forward(images)
                 # ==================== Loss calculation ===================
-                # reconstruction_error = -self.gaussian_LL(images, img_rec)
-                reconstruction_error = self.bce_loss(img_rec, images)
+                reconstruction_error = -self.gaussian_LL(images, img_rec)
+                # reconstruction_error = self.bce_loss(img_rec, images)
                 # reconstruction_error = self.loss(img_rec, images)
                 kl_div = self.kl_div(mu_Q, std_Q, mu_P, std_P)
                 # kl_div2 = self.kl_div_eff(mu_Q, std_Q, mu_P, std_P)
