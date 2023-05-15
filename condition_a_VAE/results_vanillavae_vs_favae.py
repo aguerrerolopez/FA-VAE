@@ -10,13 +10,13 @@ os.environ["CUDA_VISIBLE_DEVICES"]="2"
 torch.manual_seed(0)
 np.random.seed(0)
 #================= LOAD MODELS =================
-usps_mnist_path = open('./results/esc1_pretrained_conditioned.pickle', 'rb')
-model = pickle.load(usps_mnist_path)
+usps_mnist_path = open('./results/esc1_favae_celeba_attributes_predictiveG.pickle', 'rb')
+model_predictiveG = pickle.load(usps_mnist_path)
 usps_mnist_path.close()
 del usps_mnist_path
 
-usps_mnist_path = open('./results/pretrained_celeba_vanillavae_v3.pickle', 'rb')
-modelpre = pickle.load(usps_mnist_path)
+usps_mnist_path = open('./results/esc1_favae_celeba_attributes_fullG.pickle', 'rb')
+model_fullG = pickle.load(usps_mnist_path)
 usps_mnist_path.close()
 del usps_mnist_path
 
@@ -31,7 +31,7 @@ ploti=0
 for i in range(2):
     for j in range(4):
         ax[i,j].set_title(labels[ploti])
-        ax[i,j].imshow(np.transpose(img_conditional[ploti], axes=[1,2,0]))
+        ax[i,j].imshow(np.transpose(img_conditional[ploti].cpu().detach(), axes=[1,2,0]))
         ploti+=1
 plt.tight_layout()
 plt.show()

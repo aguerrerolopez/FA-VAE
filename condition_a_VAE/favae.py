@@ -23,9 +23,7 @@ import celeba_deepvanilla_vae as img_vae
 torch.manual_seed(0)
 np.random.seed(0)
 
-logging.basicConfig(filename='./logs/errors10.log', level=logging.DEBUG,
-                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
-logger=logging.getLogger(__name__)
+
 
 class SSHIBA(object):
     """ Bayessian Inter-Battery Factor Analysis
@@ -236,7 +234,6 @@ class SSHIBA(object):
 
             #Regression
             if arg['method'] == 'reg':
-                # self.t.append(np.ones((self.n_max,)).astype(int))
                 self.X[m]['data'] = data
                 self.X[m]['mean'] = np.copy(self.X[m]['data'])
                 if self.n_max > self.n[m]:
@@ -249,7 +246,6 @@ class SSHIBA(object):
                     if (self.X_init is None):
                         for d in np.arange(self.d[m]):
                             if np.sum(self.SS_mask[m][:,d]) == self.SS_mask[m].shape[0]:
-
                                 self.X[m]['mean'][self.SS_mask[m][:,d],d]= np.random.normal(0.0, 1.0, np.sum(self.SS_mask[m][:,d]))
                             else:
                                 self.X[m]['mean'][self.SS_mask[m][:,d],d] = np.random.normal(np.nanmean(self.X[m]['mean'][:,d],axis=0), np.nanstd(self.X[m]['mean'][:,d],axis=0), np.sum(self.SS_mask[m][:,d]))
@@ -269,18 +265,6 @@ class SSHIBA(object):
                 self.img_vae[m]= img_vae.ImgVAE(dimx=arg['latent_dim'], channels=arg['data'].shape[1], lr=arg['lr'], h=arg['data'].shape[2], w=arg['data'].shape[3], dataset=arg['dataset'], latentspace_lr=self.latentspace_lr)
                 # No implemented yet the Semisupervised mode, en este caso ss será si faltan fotos opr tanto en la dimensión 0
                 self.SS.append(False)
-
-            # Categorical
-            elif arg['method'] == 'cat':
-                self.keep_training.append(True)
-                self.t[m] = copy.deepcopy(info)
-                self.t[m]['epochs']= arg['epochs']
-                self.t[m]['data'] = data
-                self.cat_vae[m] = cat_vae.CatVAE(dimx=arg['latent_dim'], categories=arg['data'].shape[1], lr=arg['lr'])
-                self.cat_counter+=1
-                # No implemented yet the Semisupervised mode, en este caso ss será si faltan fotos opr tanto en la dimensión 0
-                self.SS.append(False)
-
             #Multilabel
             elif arg['method'] == 'mult':
                 self.t[m] = copy.deepcopy(info)
@@ -397,7 +381,7 @@ class SSHIBA(object):
 
 
     def fit_iterate(self, max_iter = int(1e3), pruning_crit = 1e-6, tol = 1e-5, feat_crit = 1e-6, perc = False, verbose = 0, Y_tst = [None],
-                    X_tst = [None], X_tr = [None], HL = 0, AUC = 0, ACC= 0, mse = 0, R2 = 0, m_in = [0], m_out = 1, steps=50, nnd=None,
+                    X_tst = [None], X_tr = [None], HL = 0, AUC = 0, ACC= 0, mse = 0, R2 = 0, m_in = [0], m_out = 1, steps=50, nnd=None, pretrained=0,
                     mc_it = 1, Y_ss=None, store = False, xga=None, tgx=None, lr=None):
         """Iterate to fit model to data.
 
@@ -420,7 +404,7 @@ class SSHIBA(object):
         """
         #### WANDB information
         print("Inicializando WANDB")
-        self.wandb = wandb.init(project="vae-sshiba", group='Multi-VAE comparison', job_type='favae_mnist', entity="alexjorguer")
+        self.wandb = wandb.init(project="vae-sshiba", group='Multi-VAE comparison', job_type='favae_celeba_gpred', entity="alexjorguer", mode="offline")
         print("WANDB listo")
         #### WANDB information
         verboseprint = print if verbose else lambda *a, **k: None
@@ -448,7 +432,6 @@ class SSHIBA(object):
                 if len(self.L)>1:
                     if self.L[-1] > self.L[-2]: text = " "
                     else: text = "LOWER!!!!"
-                # verboseprint('\rIteration %d Lower Bound %.1f K %4d' %(len(self.L),self.L[-1], q.Kc), end='\r', flush=True)
                 verboseprint('\rIteration %d Lower Bound %.1f K %4d %s' %(len(self.L),self.L[-1], q.Kc, text))
                 if (len(self.L) > 100) and (abs(1 - np.mean(self.L[-101:-1])/self.L[-1]) < tol):
                     verboseprint('\nModel correctly trained. Convergence achieved')
@@ -806,11 +789,21 @@ class SSHIBA(object):
 
             if self.method[m] == 'img':
                 # Train the VAE
-                if iter_count==0: epochs, beta = 50, 0.1
-                elif iter_count==1: epochs, beta = 20, 0.5
-                else: epochs, beta, self.keep_training[m] = 20, 1, False
+                if iter_count==0: 
+                    epochs, beta = 50, 1
+                elif iter_count>0 and iter_count<3: 
+                    epochs, beta = 5, 1
+                    # Then, we use the mean and covariance of the predictive Z
+                elif iter_count>=3:
+                    self.keep_training[m] = False
+                    epochs = 5
+                    beta = 5
+
+                Z_in = {'mean': q.Z['mean_pred'][m], 'cov': q.Z['covs_pred'][m]}
+                # Z_in = q.Z
+
                 if self.keep_training[m]:
-                    self.keep_training[m] = self.img_vae[m].trainloop(img=self.t[m]['data'], Z=q.Z, W=q.W[m], b=q.b[m], tau=q.tau_mean(m), epochs=epochs, favae=True)
+                    self.keep_training[m] = self.img_vae[m].trainloop(img=self.t[m]['data'], Z=Z_in, W=q.W[m], b=q.b[m], tau=q.tau_mean(m), epochs=epochs, favae=True, beta=beta)
 
                     self.wandb_metrics[self.img_vae[m].dataset+" ELBO"] = float(self.img_vae[m].elbo_training[-1])
                     self.wandb_metrics[self.img_vae[m].dataset+" Gaussian LogLikelihood"] = float(-self.img_vae[m].reconstruc_during_training[-1])
@@ -819,13 +812,13 @@ class SSHIBA(object):
                     self.total_elbo.append(self.img_vae[m].elbo_training)
                     self.recon_loss.append(self.img_vae[m].reconstruc_during_training)
                     self.kl_q_p.append(self.img_vae[m].KL_QandP)
-                    self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
+                    # self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
                     # Update X mean and X cov
                     self.X[m]['mean'], self.X[m]['cov'] = self.img_vae[m].update_x(img=self.t[m]['data'])
                     self.X[m]['prodT'] = np.dot(self.X[m]['mean'].T, self.X[m]['mean']) + np.diag(np.sum(self.X[m]['cov'],axis=0))
                 else:
                     if iter_count%10==0:
-                        self.img_vae[m].trainloop(img=self.t[m]['data'], Z=q.Z, W=q.W[m], b=q.b[m], tau=q.tau_mean(m), epochs=epochs)
+                        self.img_vae[m].trainloop(img=self.t[m]['data'], Z=Z_in, W=q.W[m], b=q.b[m], tau=q.tau_mean(m), epochs=epochs)
 
                         self.wandb_metrics[self.img_vae[m].dataset+" ELBO"] = float(self.img_vae[m].elbo_training[-1])
                         self.wandb_metrics[self.img_vae[m].dataset+" Gaussian LogLikelihood"] = float(-self.img_vae[m].reconstruc_during_training[-1])
@@ -834,7 +827,7 @@ class SSHIBA(object):
                         self.total_elbo.append(self.img_vae[m].elbo_training)
                         self.recon_loss.append(self.img_vae[m].reconstruc_during_training)
                         self.kl_q_p.append(self.img_vae[m].KL_QandP)
-                        self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
+                        # self.kl_q_normal.append(self.img_vae[m].KL_QandNormal)
                         # Update X mean and X cov
                         self.X[m]['mean'], self.X[m]['cov'] = self.img_vae[m].update_x(img=self.t[m]['data'])
                         self.X[m]['prodT'] = np.dot(self.X[m]['mean'].T, self.X[m]['mean']) + np.diag(np.sum(self.X[m]['cov'],axis=0))
@@ -849,6 +842,14 @@ class SSHIBA(object):
                 print("R2 reconstruction score in training for "+self.img_vae[m].dataset+" dataset")
                 print(r2_train)
 
+                # check predicting power
+                imgs = self.struct_data(self.X[m]['data'], 'vae')
+                t_train= self.predict([0], [1], imgs)
+                r2_acc = r2_score(self.t[1]['data'], t_train["output_view1"]['mean_x'])
+                self.wandb_metrics[self.img_vae[m].dataset+" r2_acc in the second view"] = r2_acc
+                print("r2_acc in the second view for "+self.img_vae[m].dataset+" dataset")
+                print(r2_acc)
+
             # MultiLabel
             elif self.method[m] == 'mult':
                 for i in np.arange(2):
@@ -858,6 +859,8 @@ class SSHIBA(object):
                         # Updating the mean and variance of t* for the SS case
                         self.update_t(m)
                         self.t[m]['mean'][self.SS_mask[m]] = q.tS[m]['mean'][self.SS_mask[m]]
+
+                
                 #Update of the variable tau
                 self.update_tau(m)
 
@@ -963,26 +966,36 @@ class SSHIBA(object):
         """
         q = self.q_dist
 
+        # Whole Z_cov
+        tau_W_prodT = np.sum([q.tau_mean(m) * q.W[m]['prodT'] for m in np.arange(self.m)], axis=0)
+        aux = np.eye(q.Kc) + tau_W_prodT
+        Z_cov = self.myInverse(aux)
+
+        # Different preditive Z_Covs
+        q.Z['covs_pred'] = []
         aux = np.eye(q.Kc)
         for m in np.arange(self.m):
-            aux += q.tau_mean(m)*q.W[m]['prodT']
-        Z_cov = self.myInverse(aux)
+            tau_W_prodT = np.sum((q.tau_mean(j) * q.W[j]['prodT']) for j in np.arange(self.m) if j != m)
+            aux += tau_W_prodT
+            q.Z['covs_pred'].append(self.myInverse(aux))
 
         if not np.any(np.isnan(Z_cov)):
             # cov
             q.Z['cov'] = Z_cov
             # mean
-            mn = np.zeros((self.n_max,q.Kc))
-            for m in np.arange(self.m):
-                # norm_W = q.W[m]['mean'] / q.W[m]['mean'].sum(axis=1)[:, np.newaxis]
-                mn += np.dot(np.subtract(self.X[m]['mean'], q.b[m]['mean']), q.W[m]['mean']) * q.tau_mean(m)
-                # print("Mean of <W> ", m)
-                # print(np.mean(q.W[m]['mean']))
-                # print(np.mean(norm_W))
-                ""
+            mn = np.stack([np.dot(np.subtract(self.X[m]['mean'], q.b[m]['mean']), q.W[m]['mean']) * q.tau_mean(m) for m in np.arange(self.m)]).sum(axis=0)
             q.Z['mean'] = self.batchRate(np.dot(mn,q.Z['cov']), q.Z['mean'], self.latentspace_lr)
             # E[Y*Y^T]
             q.Z['prodT'] = np.dot(q.Z['mean'].T, q.Z['mean']) + self.n_max*q.Z['cov']
+
+            # q.Z['mean'] for each predictive Z
+            q.Z['mean_pred'] = []
+            # E[Y*Y^T] for each predictive Z
+            q.Z['prodT_pred'] = []
+            for m in np.arange(self.m):
+                mn = np.stack([np.dot(np.subtract(self.X[j]['mean'], q.b[j]['mean']), q.W[j]['mean']) * q.tau_mean(j) for j in np.arange(self.m) if j != m]).sum(axis=0)
+                q.Z['mean_pred'].append(self.batchRate(np.dot(mn,q.Z['covs_pred'][m]), q.Z['mean'], self.latentspace_lr))
+                q.Z['prodT_pred'].append(np.dot(q.Z['mean_pred'][m].T, q.Z['mean_pred'][m]) + self.n_max*q.Z['covs_pred'][m])
         else:
             print ('Cov Z is not invertible, not updated')
 

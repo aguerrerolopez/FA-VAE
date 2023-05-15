@@ -12,29 +12,34 @@ from torch import nn
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 
+
 class VAE(nn.Module):
-    def __init__(self, channels=1, h=None, w=None, zDim=2, dataset="mnist", latentspace_lr=1):
+    def __init__(
+        self, channels=1, h=None, w=None, zDim=2, dataset="mnist", latentspace_lr=1
+    ):
         super(VAE, self).__init__()
         self.channels = channels
-        self.dataset=dataset
+        self.dataset = dataset
         self.latentspace_lr = latentspace_lr
-
+        self.latentdim = zDim
         modules = []
         hidden_dims = [64, 128, 256, 512, 1024]
         # CNN Encoder
         for h_dim in hidden_dims:
             modules.append(
                 nn.Sequential(
-                    nn.Conv2d(channels, out_channels=h_dim,
-                              kernel_size= 3, stride= 2, padding  = 1),
+                    nn.Conv2d(
+                        channels, out_channels=h_dim, kernel_size=3, stride=2, padding=1
+                    ),
                     nn.BatchNorm2d(h_dim),
-                    nn.LeakyReLU())
+                    nn.LeakyReLU(),
+                )
             )
             channels = h_dim
         # MLP encoder to generate mu and var
         self.enc = nn.Sequential(*modules)
-        self.fc_mu = nn.Linear(hidden_dims[-1]*4, zDim)
-        self.fc_var = nn.Linear(hidden_dims[-1]*4, zDim)
+        self.fc_mu = nn.Linear(hidden_dims[-1] * 4, zDim)
+        self.fc_var = nn.Linear(hidden_dims[-1] * 4, zDim)
         # CNN Decoder
         modules = []
         self.decoder_input = nn.Linear(zDim, hidden_dims[-1] * 4)
@@ -42,28 +47,35 @@ class VAE(nn.Module):
         for i in range(len(hidden_dims) - 1):
             modules.append(
                 nn.Sequential(
-                    nn.ConvTranspose2d(hidden_dims[i],
-                                       hidden_dims[i + 1],
-                                       kernel_size=3,
-                                       stride = 2,
-                                       padding=1,
-                                       output_padding=1),
+                    nn.ConvTranspose2d(
+                        hidden_dims[i],
+                        hidden_dims[i + 1],
+                        kernel_size=3,
+                        stride=2,
+                        padding=1,
+                        output_padding=1,
+                    ),
                     nn.BatchNorm2d(hidden_dims[i + 1]),
-                    nn.LeakyReLU())
+                    nn.LeakyReLU(),
+                )
             )
         self.dec = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(
-                            nn.ConvTranspose2d(hidden_dims[-1],
-                                               hidden_dims[-1],
-                                               kernel_size=3,
-                                               stride=2,
-                                               padding=1,
-                                               output_padding=1),
-                            nn.BatchNorm2d(hidden_dims[-1]),
-                            nn.LeakyReLU(),
-                            nn.Conv2d(hidden_dims[-1], out_channels= self.channels,
-                                      kernel_size= 3, padding= 1),
-                            nn.Sigmoid())
+            nn.ConvTranspose2d(
+                hidden_dims[-1],
+                hidden_dims[-1],
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                output_padding=1,
+            ),
+            nn.BatchNorm2d(hidden_dims[-1]),
+            nn.LeakyReLU(),
+            nn.Conv2d(
+                hidden_dims[-1], out_channels=self.channels, kernel_size=3, padding=1
+            ),
+            nn.Sigmoid(),
+        )
 
     def encoder(self, x):
         # CNN
@@ -71,11 +83,11 @@ class VAE(nn.Module):
         # MLP that generate mu and log_var
         x = torch.flatten(x, start_dim=1)
         mu = self.fc_mu(x)
-        log_var = self.fc_var(x)+1e-6 # Clip the lowerboung of log_var to 1e-6
-        return mu, torch.exp(0.5*log_var)
+        log_var = self.fc_var(x) + 1e-6  # Clip the lowerboung of log_var to 1e-6
+        return mu, torch.exp(0.5 * log_var)
 
     def reparameterize(self, mu, std):
-        #Reparameterization takes in the input mu and std and sample the mu + std * eps
+        # Reparameterization takes in the input mu and std and sample the mu + std * eps
         eps = torch.randn_like(std)
         return eps.mul(std).add_(mu)
 
@@ -94,16 +106,32 @@ class VAE(nn.Module):
 
 
 class ImgVAE(VAE):
-
-    def __init__(self, dimx=2, channels=1, var_x=0.01, lr=1e-5, h=None, w=None, dataset=None, latentspace_lr=1):
-        
-        super().__init__(channels=channels, h=h, w=w, zDim=dimx, dataset=dataset, latentspace_lr=latentspace_lr)
+    def __init__(
+        self,
+        dimx=2,
+        channels=1,
+        var_x=0.01,
+        lr=1e-5,
+        h=None,
+        w=None,
+        dataset=None,
+        latentspace_lr=1,
+    ):
+        super().__init__(
+            channels=channels,
+            h=h,
+            w=w,
+            zDim=dimx,
+            dataset=dataset,
+            latentspace_lr=latentspace_lr,
+        )
         self.lr = lr
-        self.dimx=dimx
+        self.dimx = dimx
         self.var_x = var_x
-        self.optim = torch.optim.Adam(self.parameters(), self.lr) 
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") 
-        print(self.device) 
+        self.optim = torch.optim.Adam(self.parameters(), self.lr)
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.bce_loss = nn.BCELoss(reduction="sum")
+        print(self.device)
         self.to(self.device)
 
     def kl_div(self, mu_Q, std_Q, mu_P, std_P):
@@ -117,20 +145,44 @@ class ImgVAE(VAE):
         p = torch.distributions.Normal(mu_P, std_P)
         # Calculate KL(q||p)
         kl = torch.distributions.kl_divergence(q, p)
-        return kl.sum(axis=1).mean() # Mean reduction. It has to be equal as reconstruction reduciton
+        return kl.sum(
+            axis=1
+        ).mean()  # Mean reduction. It has to be equal as reconstruction reduciton
 
     def gaussian_LL(self, true_images, reconstructed_images):
-        D = true_images.shape[1] * true_images.shape[2] * true_images.shape[3] # Dimension of the image
+        D = (
+            true_images.shape[1] * true_images.shape[2] * true_images.shape[3]
+        )  # Dimension of the image
         true_images = true_images.reshape(-1, D)
         reconstructed_images = reconstructed_images.reshape(-1, D)
         var_x = torch.ones_like(reconstructed_images) * self.var_x
         # Constant term in the Gaussian distribution
         cnt = D * np.log(2 * np.pi) + torch.sum(torch.log(var_x), dim=-1)
         # Log-likelihood per datapoint
-        logp_data = -0.5 * (cnt + torch.sum((true_images - reconstructed_images) * var_x ** -1 * (true_images - reconstructed_images), dim=-1))
-        return logp_data.mean() # Mean reduction. It has to be equal as KL reduciton
- 
-    def trainloop(self, img=None, Z=None, W=None, b=None, tau=None, epochs=20, wandb=None, favae=False):
+        logp_data = -0.5 * (
+            cnt
+            + torch.sum(
+                (true_images - reconstructed_images)
+                * var_x**-1
+                * (true_images - reconstructed_images),
+                dim=-1,
+            )
+        )
+        return logp_data.mean()  # Mean reduction. It has to be equal as KL reduciton
+
+    def trainloop(
+        self,
+        img=None,
+        Z=None,
+        W=None,
+        b=None,
+        tau=None,
+        epochs=20,
+        wandb=None,
+        favae=False,
+        beta=1,
+    ):
+        beta = 1
         if img is not None:
             self.img = torch.tensor(img)
         # Lists to store training evolution
@@ -142,12 +194,19 @@ class ImgVAE(VAE):
         # Select the prior distribution if it works inside FA-VAE or alone.
         if favae:
             # With FA-VAE our prior is N(ZW, inv(tau))
-            Z_sampled = Z['mean'] + np.random.normal()*np.sqrt(np.diag(Z['cov']))
-            W_sampled = W['mean'] + np.random.normal()*np.sqrt(np.diag(W['cov']))
-            b_sampled = b['mean'] + np.random.normal()*np.sqrt(np.diag(b['cov']))
+            sample = False  # We don't sample from the posterior distribution during training so it is more stable
+            # Sample from the posterior distribution
+            if sample:
+                Z_sampled = Z["mean"] + np.random.normal() * np.sqrt(np.diag(Z["cov"]))
+                W_sampled = W["mean"] + np.random.normal() * np.sqrt(np.diag(W["cov"]))
+                b_sampled = b["mean"] + np.random.normal() * np.sqrt(np.diag(b["cov"]))
 
-            # Calculate moments of the Prior
-            prior_mean = torch.from_numpy(Z_sampled@W_sampled.T+b_sampled)
+                # Calculate moments of the Prior
+                prior_mean = torch.from_numpy(Z_sampled @ W_sampled.T + b_sampled)
+            else:
+                print("Not sampling, using moments")
+                # Calculate moments of the Prior
+                prior_mean = torch.from_numpy(Z["mean"] @ W["mean"].T + b["mean"])
             tau = torch.Tensor(np.asarray(tau)).to(self.device)
         else:
             # Without FA-VAE we suppose a N(0,1) as prior
@@ -170,16 +229,21 @@ class ImgVAE(VAE):
                 images = images.to(self.device)
                 # Moments of the prior
                 mu_P = prior_mu.to(self.device)
-                var_P = torch.ones_like(mu_P)*(1/tau)
-                std_P = torch.sqrt(var_P)
+                std_P = torch.sqrt(torch.ones_like(mu_P) * (1 / tau))
                 # ==================== Gradient calculation ===================
                 self.optim.zero_grad()
                 # ==================== VAE forward===================
                 img_rec, mu_Q, std_Q, latent_sample = self.forward(images)
                 # ==================== Loss calculation ===================
-                reconstruction_error = -self.gaussian_LL(images, img_rec)
+                # reconstruction_error = -self.gaussian_LL(images, img_rec)
+                reconstruction_error = self.bce_loss(img_rec, images)
+                # reconstruction_error = self.loss(img_rec, images)
                 kl_div = self.kl_div(mu_Q, std_Q, mu_P, std_P)
-                loss = reconstruction_error + kl_div
+                # kl_div2 = self.kl_div_eff(mu_Q, std_Q, mu_P, std_P)
+                print("Reconstruction error: ", reconstruction_error)
+                print("KL divergence: ", kl_div)
+                loss = reconstruction_error + beta * kl_div
+                print("Loss: ", loss)
                 elbo = -loss
                 # ==================== Gradient calculation ===================
                 loss.backward()
@@ -189,50 +253,79 @@ class ImgVAE(VAE):
                 train_elbo += elbo.data.cpu().numpy()
                 train_rec += reconstruction_error.data.cpu().numpy()
                 train_kl_l += kl_div.data.cpu().numpy()
-            # Calculate metrics by batch
-            self.loss_during_training.append(train_loss/len(loader))
-            self.elbo_training.append(train_elbo/len(loader))
-            self.reconstruc_during_training.append(train_rec/len(loader))
-            self.KL_QandP.append(train_kl_l/len(loader))
+            # Calculate metrics by epoch
+            self.loss_during_training.append(train_loss / len(loader))
+            self.elbo_training.append(train_elbo / len(loader))
+            self.reconstruc_during_training.append(train_rec / len(loader))
+            self.KL_QandP.append(train_kl_l / len(loader))
             # Overfitter checker: check if the ELBO is better or worse that previous one
             elbo_checker = self.restore_weights(elbo_checker, e)
             # Log the metrics to W&B server
-            metrics = {self.dataset+" ELBO": float(self.elbo_training[-1]), self.dataset+" Gaussian LogLikelihood": float(-self.reconstruc_during_training[-1]), 
-            self.dataset+" KL(Q||P)": float(self.KL_QandP[-1])}
-            if wandb is not None: wandb.log(metrics)
+            metrics = {
+                self.dataset + " ELBO": float(self.elbo_training[-1]),
+                self.dataset
+                + " Gaussian LogLikelihood": float(
+                    -self.reconstruc_during_training[-1]
+                ),
+                self.dataset + " KL(Q||P)": float(self.KL_QandP[-1]),
+            }
+            if wandb is not None:
+                wandb.log(metrics)
             # Print metric by screen
-            if(e%1==0):
-                print('Train Epoch: {} \tLoss: {:.3f} ELBO: {:.3f} BCE: {:.3f} KL: {:.3f}'.format(e,self.loss_during_training[-1],self.elbo_training[-1], 
-                self.reconstruc_during_training[-1], self.KL_QandP[-1]))
-    
-        # When convergence is reached, we stop training the VAE
-        keep_train = abs(1-np.mean(self.elbo_training[-10:])/self.elbo_training[-1])>1e-4
+            if e % 1 == 0:
+                print(
+                    "Train Epoch: {} \tLoss: {:.3f} ELBO: {:.3f} BCE: {:.3f} KL: {:.3f}".format(
+                        e,
+                        self.loss_during_training[-1],
+                        self.elbo_training[-1],
+                        self.reconstruc_during_training[-1],
+                        self.KL_QandP[-1],
+                    )
+                )
 
-        # Delete variables to release GPU memory 
-        del prior_mean, tau, images, mu_P, std_P, mu_Q, std_Q, img_rec
-        torch.cuda.empty_cache()
-        
+        # When convergence is reached, we stop training the VAE
+        keep_train = (
+            abs(1 - np.mean(self.elbo_training[-10:]) / self.elbo_training[-1]) > 1e-4
+        )
+
+        # Delete variables to release GPU memory
+        # del prior_mean, tau, images, mu_P, std_P, mu_Q, std_Q, img_rec
+        # torch.cuda.empty_cache()
+
         return keep_train
 
     def restore_weights(self, elbo_checker, e):
         # If actual ELBO is better, save a checkpoint
         if self.elbo_training[-1] > elbo_checker:
-                checkpoint = {
-                    'epoch': e + 1,
-                    'elbo': self.elbo_training[-1],
-                    'state_dict': self.state_dict(),
-                    'optimizer': self.optim.state_dict(),
-                }
-                # save checkpoint
-                torch.save(checkpoint, "./checkpoints/"+self.dataset+"_celeba_vanilla_"+str(self.latentspace_lr)+".pt")
-                elbo_checker = self.elbo_training[-1]
+            checkpoint = {
+                "epoch": e + 1,
+                "elbo": self.elbo_training[-1],
+                "state_dict": self.state_dict(),
+                "optimizer": self.optim.state_dict(),
+            }
+            # save checkpoint
+            torch.save(
+                checkpoint,
+                "./checkpoints/"
+                + self.dataset
+                + "_celeba_vanilla_"
+                + str(self.latentspace_lr)
+                + ".pt",
+            )
+            elbo_checker = self.elbo_training[-1]
         # If actual ELBO is worse, load best checkpoint
         if self.elbo_training[-1] < elbo_checker:
             print("Restoring best training elbo")
-            ckp = torch.load("./checkpoints/"+self.dataset+"_celeba_vanilla_"+str(self.latentspace_lr)+".pt")
-            self.load_state_dict(ckp['state_dict'])
-            self.optim.load_state_dict(ckp['optimizer'])
-            elbo_checker = ckp['elbo']
+            ckp = torch.load(
+                "./checkpoints/"
+                + self.dataset
+                + "_celeba_vanilla_"
+                + str(self.latentspace_lr)
+                + ".pt"
+            )
+            self.load_state_dict(ckp["state_dict"])
+            self.optim.load_state_dict(ckp["optimizer"])
+            elbo_checker = ckp["elbo"]
         return elbo_checker
 
     def update_x(self, img=None):
@@ -253,30 +346,40 @@ class ImgVAE(VAE):
             for batch_image in loader:
                 batch_image = batch_image[0].to(self.device)
                 mu_Qbatch, std_Qbatch = self.encoder(batch_image)
-                mu[batch_index:batch_index+batch_image.shape[0]] = mu_Qbatch.data.cpu().numpy()
-                var[batch_index:batch_index+batch_image.shape[0]] = std_Qbatch.pow(2).data.cpu().numpy()
-                batch_index+=batch_image.shape[0]
+                mu[
+                    batch_index : batch_index + batch_image.shape[0]
+                ] = mu_Qbatch.data.cpu().numpy()
+                var[batch_index : batch_index + batch_image.shape[0]] = (
+                    std_Qbatch.pow(2).data.cpu().numpy()
+                )
+                batch_index += batch_image.shape[0]
         del img, dataset, loader, batch_image, mu_Qbatch, std_Qbatch
         torch.cuda.empty_cache()
         return mu, var
 
     def reconstruction(self, mean, var):
         # Given mean and var of Q, reconstruct an image
-        sample=torch.Tensor(mean+np.random.randn()*np.sqrt(var))
+        sample = torch.Tensor(mean + np.random.randn() * np.sqrt(var))
         dataset = TensorDataset(sample)
         loader = DataLoader(dataset=dataset, batch_size=64, shuffle=False)
-        img_rec = np.zeros((mean.shape[0], self.img.shape[1], self.img.shape[2], self.img.shape[3]))
+        img_rec = np.zeros(
+            (mean.shape[0], self.img.shape[1], self.img.shape[2], self.img.shape[3])
+        )
         self.eval()
         with torch.no_grad():
             batch_index = 0
             for batch_image in loader:
                 batch_image = batch_image[0].to(self.device)
                 # We obtain an image using the decoder
-                if self.dataset=='mnist':
-                    img_rec[batch_index:batch_index+batch_image.shape[0], :, :, :] = self.decoder(batch_image).data.cpu().numpy()
+                if self.dataset == "mnist":
+                    img_rec[
+                        batch_index : batch_index + batch_image.shape[0], :, :, :
+                    ] = (self.decoder(batch_image).data.cpu().numpy())
                 else:
-                    img_rec[batch_index:batch_index+batch_image.shape[0], :, :, :] = self.decoder(batch_image).data.cpu().numpy()
-                batch_index+=batch_image.shape[0]
+                    img_rec[
+                        batch_index : batch_index + batch_image.shape[0], :, :, :
+                    ] = (self.decoder(batch_image).data.cpu().numpy())
+                batch_index += batch_image.shape[0]
         del batch_image, dataset, loader, sample, batch_index, mean, var
         torch.cuda.empty_cache()
         return img_rec
@@ -284,13 +387,15 @@ class ImgVAE(VAE):
     def predict(self, Z=None, W=None, b=None, tau=None, mean_x=None, var_x=None):
         # Predict/Generate a new image given N(ZW+b,tau) or N(0,1)
         if mean_x is None:
-            Z_sampled = Z['mean'] + np.random.normal()*np.sqrt(np.diag(Z['cov']))
-            W_sampled = W['mean'] + np.random.normal()*np.sqrt(np.diag(W['cov']))
-            b_sampled = b['mean'] + np.random.normal()*np.sqrt(np.diag(b['cov']))
+            Z_sampled = Z["mean"] + np.random.normal() * np.sqrt(np.diag(Z["cov"]))
+            W_sampled = W["mean"] + np.random.normal() * np.sqrt(np.diag(W["cov"]))
+            b_sampled = b["mean"] + np.random.normal() * np.sqrt(np.diag(b["cov"]))
 
             # Calculate moments of sshiba latent space
-            mean = torch.from_numpy(Z_sampled@W_sampled.T+b_sampled)
-            std = torch.sqrt(torch.ones_like(mean)/torch.from_numpy(np.asarray(1/tau)))
+            mean = torch.from_numpy(Z_sampled @ W_sampled.T + b_sampled)
+            std = torch.sqrt(
+                torch.ones_like(mean) / torch.from_numpy(np.asarray(1 / tau))
+            )
         else:
             mean = torch.from_numpy(mean_x)
             std = torch.sqrt(torch.from_numpy(var_x))
@@ -299,20 +404,26 @@ class ImgVAE(VAE):
         dataset = TensorDataset(rsample)
         loader = DataLoader(dataset=dataset, batch_size=64, shuffle=False)
 
-        img_aprox = np.zeros((mean.shape[0], self.img.shape[1], self.img.shape[2], self.img.shape[3]))
+        img_aprox = np.zeros(
+            (mean.shape[0], self.img.shape[1], self.img.shape[2], self.img.shape[3])
+        )
         self.eval()
         with torch.no_grad():
             batch_index = 0
             for batch_image in loader:
                 batch_image = batch_image[0].to(self.device)
                 # We obtain an image using the decoder
-                if self.dataset=='mnist':
-                    img_aprox[batch_index:batch_index+batch_image.shape[0], :, :, :] = self.decoder(batch_image).data.cpu().numpy()
+                if self.dataset == "mnist":
+                    img_aprox[
+                        batch_index : batch_index + batch_image.shape[0], :, :, :
+                    ] = (self.decoder(batch_image).data.cpu().numpy())
                 else:
-                    img_aprox[batch_index:batch_index+batch_image.shape[0], :, :, :] = self.decoder(batch_image).data.cpu().numpy()
-                batch_index+=batch_image.shape[0]
+                    img_aprox[
+                        batch_index : batch_index + batch_image.shape[0], :, :, :
+                    ] = (self.decoder(batch_image).data.cpu().numpy())
+                batch_index += batch_image.shape[0]
 
-        # Release GPU memory 
+        # Release GPU memory
         del batch_image, dataset, loader, batch_index, p, mean, std
         torch.cuda.empty_cache()
 
