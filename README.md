@@ -63,13 +63,6 @@ The data used in this study is publicly available. You should create a folder ca
 and download there CelebA and Cartoon datasets. Due to their size, we do not upload them to
 this repo.
 
-## Get the repo!
-
-You can clone this 
-[git](https://git-scm.com/) repository by running:
-
-    git clone https://github.com/aguerrerolopez/FA-VAE
-
 
 ## Dependencies
 
